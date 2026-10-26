@@ -1,0 +1,48 @@
+name: Job Scout
+
+on:
+  schedule:
+    # Every 6 hours at minute 0, UTC. GitHub may start scheduled runs a few minutes late.
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: job-scout-ai
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  scout:
+    name: Scan and score listings
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Restore seen listings
+        uses: actions/cache@v4
+        with:
+          path: data/seen_jobs.json
+          key: seen-jobs-${{ github.run_id }}
+          restore-keys: |
+            seen-jobs-
+
+      - name: Run job scout
+        env:
+          PYTHONUNBUFFERED: "1"
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python main.py
